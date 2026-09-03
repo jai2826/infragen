@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
           await prisma.generation.update({
             where: { id: generationId },
             data: { status: 'COMPLETE' },
-          }).catch((err) => logger.warn({ err }, 'Failed to update generation status to COMPLETE'));
+          }).catch((err: unknown) => logger.warn({ err }, 'Failed to update generation status to COMPLETE'));
         }
       } catch (err) {
         logger.error({ err, generationId }, 'pipeline crashed');
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
           await prisma.generation.update({
             where: { id: generationId },
             data: { status: 'FAILED' },
-          }).catch((err) => logger.warn({ err }, 'Failed to update generation status to FAILED'));
+          }).catch((err: unknown) => logger.warn({ err }, 'Failed to update generation status to FAILED'));
         }
       } finally {
         controller.close();
