@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- better-auth core tables ----------
+// (better-auth can generate/manage these itself via its CLI,
+// but they're defined here so `prisma migrate` and `better-auth`
+// stay in sync from day one.)
+
+model User {
+  id            String       @id @default(cuid())
+  name          String?
+  email         String       @unique
+  emailVerified Boolean      @default(false)
+  image         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+  generations   Generation[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  providerId        String
+  accountId         String
+  accessToken       String?
+  refreshToken      String?
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+}
+
+// ---------- Infragen domain models ----------
+
+enum InputMode {
+  TEXT
+  FILE
+  CODE
+}
+
+enum GenerationStatus {
+  PENDING
+  PARSING
+  GENERATING
+  VALIDATING
+  EXPLAINING
+  COMPLETE
+  FAILED
+}
+
+model Generation {
+  id          String           @id @default(cuid())
+  userId      String
+  inputMode   InputMode
+  rawInput    String           @db.Text
+  infraPlan   Json?            // structured output of Step 1 (Parse & Plan)
+  status      GenerationStatus @default(PENDING)
+  retryCount  Int              @default(0)
+  costEstimateMonthlyUsd Float?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts   ConfigArtifact[]
+  steps       AgentStep[]
+}
+
+enum ArtifactVariant {
+  DEV
+  PROD
+}
+
+enum ArtifactType {
+  DOCKERFILE
+  DOCKER_COMPOSE
+  K8S_DEPLOYMENT
+  K8S_SERVICE
+  K8S_CONFIGMAP
+  K8S_HPA
+}
+
+model ConfigArtifact {
+  id           String          @id @default(cuid())
+  generationId String
+  type         ArtifactType
+  variant      ArtifactVariant
+  content      String          @db.Text
+  explanation  String?         @db.Text
+  createdAt    DateTime        @default(now())
+
+  generation   Generation      @relation(fields: [generationId], references: [id], onDelete: Cascade)
+}
+
+// records every step the agent takes — this is what powers
+// the live "step tracker" UI and gives you an audit trail
+// for the retry/self-correction loop
+model AgentStep {
+  id           String   @id @default(cuid())
+  generationId String
+  stepName     String   // "parse" | "generate" | "validate" | "explain"
+  attempt      Int      @default(1)
+  status       String   // "started" | "succeeded" | "failed"
+  detail       Json?    // e.g. validation errors found, tokens used, etc.
+  createdAt    DateTime @default(now())
+
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+}
