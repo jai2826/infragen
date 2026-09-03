@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
-const apiKey = process.env.GEMINI_API_KEY;
+const rawApiKey = process.env.GEMINI_API_KEY;
+const apiKey = rawApiKey && rawApiKey !== '[SENSITIVE]' ? rawApiKey : undefined;
 
 if (!apiKey) {
   // Fail loudly at boot rather than silently at first request.

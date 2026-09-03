@@ -2,8 +2,18 @@ import pino from 'pino';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
+const VALID_LEVELS = new Set(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']);
+
+function getLogLevel(): string {
+  const envLevel = process.env.LOG_LEVEL?.toLowerCase();
+  if (envLevel && VALID_LEVELS.has(envLevel)) {
+    return envLevel;
+  }
+  return isDev ? 'debug' : 'info';
+}
+
 export const logger = pino({
-  level: process.env.LOG_LEVEL ?? (isDev ? 'debug' : 'info'),
+  level: getLogLevel(),
   transport: isDev
     ? {
         target: 'pino-pretty',
