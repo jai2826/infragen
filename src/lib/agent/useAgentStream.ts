@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { AgentEvent, ConfigArtifact, CostEstimate, InfraPlan, PipelineStep, ValidationResult } from './types';
+import type {
+  AgentEvent,
+  ConfigArtifact,
+  CostEstimate,
+  InfraPlan,
+  InputVerification,
+  PipelineStep,
+  ValidationResult,
+} from './types';
 
 export interface StepState {
   step: PipelineStep;
@@ -10,12 +18,13 @@ export interface StepState {
   error?: string;
 }
 
-const STEP_ORDER: PipelineStep[] = ['parse', 'generate', 'validate', 'explain'];
+const STEP_ORDER: PipelineStep[] = ['verify', 'parse', 'generate', 'validate', 'explain'];
 
 export function useAgentStream() {
   const [steps, setSteps] = useState<StepState[]>(
     STEP_ORDER.map((step) => ({ step, status: 'idle', attempt: 0 })),
   );
+  const [verification, setVerification] = useState<InputVerification | null>(null);
   const [plan, setPlan] = useState<InfraPlan | null>(null);
   const [artifacts, setArtifacts] = useState<ConfigArtifact[]>([]);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -26,6 +35,7 @@ export function useAgentStream() {
 
   const reset = useCallback(() => {
     setSteps(STEP_ORDER.map((step) => ({ step, status: 'idle', attempt: 0 })));
+    setVerification(null);
     setPlan(null);
     setArtifacts([]);
     setValidation(null);
@@ -97,6 +107,9 @@ export function useAgentStream() {
           case 'step_failed':
             updateStep(event.step, { status: 'failed', attempt: event.attempt, error: event.error });
             break;
+          case 'input_verification':
+            setVerification(event.verification);
+            break;
           case 'infra_plan':
             setPlan(event.plan);
             break;
@@ -125,5 +138,5 @@ export function useAgentStream() {
     setIsRunning(false);
   }, []);
 
-  return { steps, plan, artifacts, validation, costEstimate, fatalError, isRunning, start, cancel };
+  return { steps, verification, plan, artifacts, validation, costEstimate, fatalError, isRunning, start, cancel };
 }

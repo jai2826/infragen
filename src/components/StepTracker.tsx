@@ -12,12 +12,18 @@ import {
   XCircle,
   Loader2,
   RotateCw,
+  ScanSearch,
 } from 'lucide-react';
 
 const STEP_METADATA: Record<
   StepState['step'],
   { label: string; description: string; icon: React.ComponentType<{ className?: string }> }
 > = {
+  verify: {
+    label: 'Verify Input',
+    description: 'AI check for query relevance, stack feasibility & safety',
+    icon: ScanSearch,
+  },
   parse: {
     label: 'Parse & Plan',
     description: 'Extract dependencies, ports & volume bindings',

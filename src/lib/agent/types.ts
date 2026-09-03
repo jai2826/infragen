@@ -61,6 +61,20 @@ export interface CostEstimate {
   assumptions: string[];
 }
 
+export interface InputVerification {
+  isValid: boolean;
+  confidence: number;
+  detectedType:
+    | 'application_description'
+    | 'source_code'
+    | 'project_manifest'
+    | 'greeting_or_chat'
+    | 'unrelated_topic'
+    | 'insufficient_detail';
+  reason: string;
+  suggestions: string[];
+}
+
 /**
  * Events streamed to the client over SSE so the UI can render the
  * live "step tracker". Keep this shape stable — it's the contract
@@ -70,6 +84,7 @@ export type AgentEvent =
   | { type: 'step_started'; step: PipelineStep; attempt: number }
   | { type: 'step_succeeded'; step: PipelineStep; attempt: number; data?: unknown }
   | { type: 'step_failed'; step: PipelineStep; attempt: number; error: string }
+  | { type: 'input_verification'; verification: InputVerification }
   | { type: 'infra_plan'; plan: InfraPlan }
   | { type: 'artifacts'; artifacts: ConfigArtifact[] }
   | { type: 'validation'; result: ValidationResult }
@@ -77,4 +92,5 @@ export type AgentEvent =
   | { type: 'complete'; generationId: string }
   | { type: 'fatal_error'; error: string };
 
-export type PipelineStep = 'parse' | 'generate' | 'validate' | 'explain';
+export type PipelineStep = 'verify' | 'parse' | 'generate' | 'validate' | 'explain';
+

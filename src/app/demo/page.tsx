@@ -34,7 +34,7 @@ function DemoContent() {
   const initialPrompt = templateKey ? TEMPLATE_PROMPTS[templateKey] || '' : '';
 
   const { data: session } = useSession();
-  const { steps, artifacts, validation, costEstimate, fatalError, isRunning, start } =
+  const { steps, artifacts, validation, costEstimate, fatalError, isRunning, verification, start } =
     useAgentStream();
 
   return (
@@ -72,14 +72,16 @@ function DemoContent() {
             <StepTracker steps={steps} />
           </div>
 
-          {/* Fatal Error Notice */}
+          {/* Fatal Error / Input Verification Notice */}
           {fatalError && (
             <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-4 text-xs text-red-300">
               <div className="flex items-center gap-2 font-semibold mb-1">
                 <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-                <span>Generation Error</span>
+                <span>
+                  {verification && !verification.isValid ? 'Input Verification Failed' : 'Generation Error'}
+                </span>
               </div>
-              <p className="leading-relaxed">{fatalError}</p>
+              <p className="leading-relaxed whitespace-pre-line">{fatalError}</p>
             </div>
           )}
 
