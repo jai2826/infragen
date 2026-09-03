@@ -4,14 +4,24 @@ import {
   buildExplainPrompt,
   buildGeneratePrompt,
   buildParsePrompt,
+  buildVerifyPrompt,
   EXPLAIN_SYSTEM_INSTRUCTION,
   GENERATE_SYSTEM_INSTRUCTION,
   PARSE_RESPONSE_SCHEMA,
   PARSE_SYSTEM_INSTRUCTION,
+  VERIFY_RESPONSE_SCHEMA,
+  VERIFY_SYSTEM_INSTRUCTION,
 } from './prompts';
 import { validateArtifacts } from './validators';
 import { estimateMonthlyCost } from './cost-estimate';
-import type { AgentEvent, ArtifactType, ArtifactVariant, ConfigArtifact, InfraPlan } from './types';
+import type {
+  AgentEvent,
+  ArtifactType,
+  ArtifactVariant,
+  ConfigArtifact,
+  InfraPlan,
+  InputVerification,
+} from './types';
 
 const MAX_VALIDATION_RETRIES = 3;
 
@@ -38,7 +48,48 @@ export async function runAgentPipeline(
 ): Promise<void> {
   const log = getGenerationLogger(generationId);
 
-  // ---- Step 1: Parse & Plan ----
+  // ---- Step 1: Verify Input ----
+  emit({ type: 'step_started', step: 'verify', attempt: 1 });
+  let verification: InputVerification;
+  try {
+    verification = await generateStructured<InputVerification>({
+      prompt: buildVerifyPrompt(rawInput, inputMode),
+      systemInstruction: VERIFY_SYSTEM_INSTRUCTION,
+      responseSchema: VERIFY_RESPONSE_SCHEMA,
+    });
+    log.info({ verification }, 'input verification completed');
+    emit({ type: 'input_verification', verification });
+
+    if (!verification.isValid) {
+      log.warn({ verification }, 'input rejected by verification');
+      const formattedSuggestions =
+        verification.suggestions && verification.suggestions.length > 0
+          ? `\n\nSuggestions:\n` + verification.suggestions.map((s) => `• ${s}`).join('\n')
+          : '';
+      const rejectionError = `${verification.reason}${formattedSuggestions}`;
+      emit({
+        type: 'step_failed',
+        step: 'verify',
+        attempt: 1,
+        error: verification.reason,
+      });
+      emit({
+        type: 'fatal_error',
+        error: rejectionError,
+      });
+      return;
+    }
+
+    emit({ type: 'step_succeeded', step: 'verify', attempt: 1, data: verification });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown verification error';
+    log.error({ err }, 'verify step failed');
+    emit({ type: 'step_failed', step: 'verify', attempt: 1, error: message });
+    emit({ type: 'fatal_error', error: `Could not verify the input: ${message}` });
+    return;
+  }
+
+  // ---- Step 2: Parse & Plan ----
   emit({ type: 'step_started', step: 'parse', attempt: 1 });
   let plan: InfraPlan;
   try {
@@ -58,7 +109,7 @@ export async function runAgentPipeline(
     return;
   }
 
-  // ---- Step 2 + 3: Generate, then Validate with bounded retry loop ----
+  // ---- Step 3 + 4: Generate, then Validate with bounded retry loop ----
   emit({ type: 'step_started', step: 'generate', attempt: 1 });
   let artifacts: ConfigArtifact[] = [];
   let attempt = 1;
@@ -115,7 +166,7 @@ export async function runAgentPipeline(
     emit({ type: 'step_started', step: 'generate', attempt });
   }
 
-  // ---- Step 4: Explain + Cost Estimate ----
+  // ---- Step 5: Explain + Cost Estimate ----
   emit({ type: 'step_started', step: 'explain', attempt: 1 });
   try {
     const explained = await Promise.all(

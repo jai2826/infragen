@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import type { ConfigArtifact } from '@/lib/agent/types';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import {
   Layers,
   Terminal,
   Info,
+  RotateCcw,
 } from 'lucide-react';
 
 const LANGUAGE_BY_TYPE: Record<ConfigArtifact['type'], string> = {
@@ -42,9 +43,21 @@ function getFileName(a: ConfigArtifact): string {
   }
 }
 
+function getArtifactKey(a: ConfigArtifact, index: number): string {
+  return `${a.type}-${a.variant}-${index}`;
+}
+
 export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasCopied, setHasCopied] = useState(false);
+  // Store user edits per artifact key so edits persist across tab switching and download/copy
+  const [editedContent, setEditedContent] = useState<Record<string, string>>({});
+
+  // Reset local edits when a fresh set of artifacts arrives from a new generation run
+  useEffect(() => {
+    setEditedContent({});
+    setActiveIndex(0);
+  }, [artifacts]);
 
   if (artifacts.length === 0) {
     return (
@@ -66,17 +79,35 @@ export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
   if (!active) return null;
 
   const fileName = getFileName(active);
+  const activeKey = getArtifactKey(active, activeIndex);
+  const currentContent = editedContent[activeKey] ?? active.content;
+  const isEdited = editedContent[activeKey] !== undefined && editedContent[activeKey] !== active.content;
+
+  function handleContentChange(val: string | undefined) {
+    if (val !== undefined) {
+      setEditedContent((prev) => ({
+        ...prev,
+        [activeKey]: val,
+      }));
+    }
+  }
+
+  function handleReset() {
+    setEditedContent((prev) => {
+      const next = { ...prev };
+      delete next[activeKey];
+      return next;
+    });
+  }
 
   function handleCopy() {
-    if (!active) return;
-    navigator.clipboard.writeText(active.content);
+    navigator.clipboard.writeText(currentContent);
     setHasCopied(true);
     setTimeout(() => setHasCopied(false), 2000);
   }
 
   function handleDownload() {
-    if (!active) return;
-    const blob = new Blob([active.content], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([currentContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -96,10 +127,12 @@ export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
             const isSelected = i === activeIndex;
             const name = getFileName(a);
             const isDocker = a.type === 'DOCKERFILE' || a.type === 'DOCKER_COMPOSE';
+            const itemKey = getArtifactKey(a, i);
+            const itemEdited = editedContent[itemKey] !== undefined && editedContent[itemKey] !== a.content;
 
             return (
               <button
-                key={`${a.type}-${a.variant}-${i}`}
+                key={itemKey}
                 onClick={() => {
                   setActiveIndex(i);
                   setHasCopied(false);
@@ -125,19 +158,35 @@ export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
                 >
                   {a.variant}
                 </span>
+                {itemEdited && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" title="Edited" />
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Action Buttons: Copy & Download */}
+        {/* Action Buttons: Reset, Copy & Download */}
         <div className="flex items-center gap-1.5">
+          {isEdited && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+              className="h-7 gap-1 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-400/10"
+              title="Reset file to original generated version"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Reset</span>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCopy}
             className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-            title="Copy to clipboard"
+            title="Copy current code to clipboard"
           >
             {hasCopied ? (
               <>
@@ -171,7 +220,8 @@ export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
           height="100%"
           theme="vs-dark"
           language={LANGUAGE_BY_TYPE[active.type]}
-          value={active.content}
+          value={currentContent}
+          onChange={handleContentChange}
           options={{
             readOnly: false,
             minimap: { enabled: false },
