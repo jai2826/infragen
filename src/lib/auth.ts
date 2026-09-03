@@ -36,6 +36,12 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // Caches session verification for 5 minutes
+    },
+  },
   socialProviders: {
     github: {
       clientId: rawClientId && rawClientId !== '[SENSITIVE]' ? rawClientId : '',

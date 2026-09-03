@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import type { ConfigArtifact } from '@/lib/agent/types';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
   Terminal,
   Info,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 
 const LANGUAGE_BY_TYPE: Record<ConfigArtifact['type'], string> = {
@@ -47,19 +48,53 @@ function getArtifactKey(a: ConfigArtifact, index: number): string {
   return `${a.type}-${a.variant}-${index}`;
 }
 
-export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
+export function ArtifactEditor({
+  artifacts,
+  isGenerating = false,
+  totalExpected = 7,
+}: {
+  artifacts: ConfigArtifact[];
+  isGenerating?: boolean;
+  totalExpected?: number;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasCopied, setHasCopied] = useState(false);
   // Store user edits per artifact key so edits persist across tab switching and download/copy
   const [editedContent, setEditedContent] = useState<Record<string, string>>({});
+  const prevLengthRef = useRef(0);
 
-  // Reset local edits when a fresh set of artifacts arrives from a new generation run
+  // Reset local edits only when a fresh generation run starts (artifacts empty)
   useEffect(() => {
-    setEditedContent({});
-    setActiveIndex(0);
-  }, [artifacts]);
+    if (artifacts.length === 0) {
+      setEditedContent({});
+      setActiveIndex(0);
+      prevLengthRef.current = 0;
+    } else if (prevLengthRef.current === 0 && artifacts.length > 0) {
+      // First artifact arrived in a fresh run
+      setActiveIndex(0);
+      prevLengthRef.current = artifacts.length;
+    } else {
+      prevLengthRef.current = artifacts.length;
+    }
+  }, [artifacts.length]);
 
   if (artifacts.length === 0) {
+    if (isGenerating) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center p-8 text-center bg-card/40">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-500/30 text-blue-400 mb-4 animate-pulse">
+            <Loader2 className="h-7 w-7 animate-spin text-blue-400" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground mb-1">
+            Generating Infrastructure Artifacts...
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-sm">
+            Architecting Dockerfiles, Docker Compose, and Kubernetes manifests. Files will appear here in real-time as each is built.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center bg-card/40">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 border border-border/80 text-muted-foreground mb-4">
@@ -164,6 +199,14 @@ export function ArtifactEditor({ artifacts }: { artifacts: ConfigArtifact[] }) {
               </button>
             );
           })}
+
+          {/* Indicator that more artifacts are loading */}
+          {isGenerating && artifacts.length < totalExpected && (
+            <div className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/30 animate-pulse font-mono">
+              <Loader2 className="h-3 w-3 animate-spin text-blue-400" />
+              <span>Generating more ({artifacts.length}/{totalExpected})...</span>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons: Reset, Copy & Download */}

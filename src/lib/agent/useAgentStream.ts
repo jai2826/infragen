@@ -113,6 +113,19 @@ export function useAgentStream() {
           case 'infra_plan':
             setPlan(event.plan);
             break;
+          case 'artifact_generated':
+            setArtifacts((prev) => {
+              const existingIndex = prev.findIndex(
+                (a) => a.type === event.artifact.type && a.variant === event.artifact.variant,
+              );
+              if (existingIndex >= 0) {
+                const next = [...prev];
+                next[existingIndex] = event.artifact;
+                return next;
+              }
+              return [...prev, event.artifact];
+            });
+            break;
           case 'artifacts':
             setArtifacts(event.artifacts);
             break;

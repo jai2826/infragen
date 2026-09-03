@@ -86,6 +86,7 @@ export type AgentEvent =
   | { type: 'step_failed'; step: PipelineStep; attempt: number; error: string }
   | { type: 'input_verification'; verification: InputVerification }
   | { type: 'infra_plan'; plan: InfraPlan }
+  | { type: 'artifact_generated'; artifact: ConfigArtifact; index: number; total: number }
   | { type: 'artifacts'; artifacts: ConfigArtifact[] }
   | { type: 'validation'; result: ValidationResult }
   | { type: 'cost_estimate'; estimate: CostEstimate }
@@ -93,4 +94,6 @@ export type AgentEvent =
   | { type: 'fatal_error'; error: string };
 
 export type PipelineStep = 'verify' | 'parse' | 'generate' | 'validate' | 'explain';
+
+export const TOTAL_ARTIFACT_COUNT = 7;
 

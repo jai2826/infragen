@@ -117,13 +117,20 @@ export async function runAgentPipeline(
 
   while (attempt <= MAX_VALIDATION_RETRIES) {
     artifacts = await Promise.all(
-      ARTIFACT_MATRIX.map(async ({ type, variant }) => {
+      ARTIFACT_MATRIX.map(async ({ type, variant }, index) => {
         const key = `${type}:${variant}`;
         const content = await generateText(
           buildGeneratePrompt(plan, type, variant, priorIssuesByArtifact.get(key)),
           GENERATE_SYSTEM_INSTRUCTION,
         );
-        return { type, variant, content: stripCodeFences(content) };
+        const artifact: ConfigArtifact = { type, variant, content: stripCodeFences(content) };
+        emit({
+          type: 'artifact_generated',
+          artifact,
+          index,
+          total: ARTIFACT_MATRIX.length,
+        });
+        return artifact;
       }),
     );
 
@@ -170,13 +177,23 @@ export async function runAgentPipeline(
   emit({ type: 'step_started', step: 'explain', attempt: 1 });
   try {
     const explained = await Promise.all(
-      artifacts.map(async (artifact) => ({
-        ...artifact,
-        explanation: await generateText(
+      artifacts.map(async (artifact, idx) => {
+        const explanation = await generateText(
           buildExplainPrompt(artifact.type, artifact.variant, artifact.content),
           EXPLAIN_SYSTEM_INSTRUCTION,
-        ),
-      })),
+        );
+        const updated: ConfigArtifact = {
+          ...artifact,
+          explanation,
+        };
+        emit({
+          type: 'artifact_generated',
+          artifact: updated,
+          index: idx,
+          total: artifacts.length,
+        });
+        return updated;
+      }),
     );
     artifacts = explained;
     emit({ type: 'artifacts', artifacts });
