@@ -46,7 +46,15 @@ const STEP_METADATA: Record<
   },
 };
 
-export function StepTracker({ steps }: { steps: StepState[] }) {
+export function StepTracker({
+  steps,
+  artifactsCount = 0,
+  totalExpected = 7,
+}: {
+  steps: StepState[];
+  artifactsCount?: number;
+  totalExpected?: number;
+}) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -118,7 +126,11 @@ export function StepTracker({ steps }: { steps: StepState[] }) {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {meta.description}
+                  {s.step === 'generate' && isRunning
+                    ? artifactsCount > 0
+                      ? `Generating manifests (${artifactsCount}/${totalExpected} ready)...`
+                      : 'Synthesizing Docker & Kubernetes configurations...'
+                    : meta.description}
                 </p>
 
                 {isFailed && s.error && (

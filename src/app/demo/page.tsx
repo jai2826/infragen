@@ -37,6 +37,8 @@ function DemoContent() {
   const { steps, artifacts, validation, costEstimate, fatalError, isRunning, verification, start } =
     useAgentStream();
 
+  const isGenerating = steps.find((s) => s.step === 'generate')?.status === 'running';
+
   return (
     <div className="mx-auto flex h-[calc(100vh-4rem)] max-w-7xl flex-col gap-3 p-4 md:p-6 overflow-hidden">
       {/* Guest Mode Banner (if unauthenticated) */}
@@ -69,7 +71,11 @@ function DemoContent() {
 
           {/* Pipeline Tracker */}
           <div className="rounded-xl border border-border/80 bg-card/80 p-4 backdrop-blur-md shadow-md">
-            <StepTracker steps={steps} />
+            <StepTracker
+              steps={steps}
+              artifactsCount={artifacts.length}
+              totalExpected={7}
+            />
           </div>
 
           {/* Fatal Error / Input Verification Notice */}
@@ -145,7 +151,11 @@ function DemoContent() {
 
         {/* Right Column: Artifact Monaco Editor */}
         <div className="overflow-hidden rounded-xl border border-border/80 shadow-2xl bg-card/80">
-          <ArtifactEditor artifacts={artifacts} />
+          <ArtifactEditor
+            artifacts={artifacts}
+            isGenerating={isGenerating}
+            totalExpected={7}
+          />
         </div>
       </div>
     </div>
